@@ -1,43 +1,45 @@
 #lang racket
+
 (require racket/gui/base)
 
-(provide draw-hex-grid)
+(define game-canvas%
+  (class canvas%
+    (inherit get-width get-height refresh)
 
-(define scale 30)
-(define a (* 1 scale))
-(define b (* 1.732 scale))
-(define c (* 2 scale))
+    ;; direction : one of #f, 'left, 'right, 'up, 'down
+    (define direction #f)
 
-(define hex-outline
-  `(( 0        . ,(+ a c)) 
-    ( 0        . ,a) 
-    (,b        . 0) 
-    (,(* 2 b)  . ,a) 
-    (,(* 2 b)  . ,(+ a c)) 
-    (,b        . ,(* 2 c))))
+    (define/override (on-event e)
+      (case (send e get-event-type)
+        [(left-down)
+         (set! direction 
+            (string-append* (list "(" (~a (send e get-x))  ", " (~a (send e get-y)) ")")))
+         (refresh)]
+        [else (void)]))
 
-(define draw-sprites
-  (lambda (dc) (void)))
+    (define/override (on-char ke)
+      (case (send ke get-key-code)
+        [(left right up down)
+         (set! direction (send ke get-key-code))
+         (refresh)]
+        [else (void)]))
 
-(define draw-hex-grid
-  (lambda (dc)
-    (for ([i (in-range 0 9 1)])
-      (for ([j (in-range 0 14 1)])
-        (if (even? j)
-          (send dc draw-polygon hex-outline  (+ 30 (* i 100)) (+ 30 (* j 90)))
-          (send dc draw-polygon hex-outline  (+ 82 (* i 100)) (+ 30 (* j 90))))))))
+    (define/private (my-paint-callback self dc)
+      (let ([w (get-width)]
+            [h (get-height)])
+        (when direction
+          (let ([dir-text (format "going ~a" direction)])
+            (let-values ([(tw th _ta _td)
+                          (send dc get-text-extent dir-text)])
+              (send dc draw-text
+                    dir-text 
+                    (max 0 (/ (- w tw) 2))
+                    (max 0 (/ (- h th) 2))))))))
 
-(define frame (new frame%
-                   [label "Gamer Game"]
-                   [width 660]
-                   [height 860]))
+    (super-new (paint-callback (lambda (c dc) (my-paint-callback c dc))))))
 
-(new canvas% [parent frame]
-             [paint-callback
-              (lambda (canvas dc)
-                (draw-sprites dc)
-                (send dc set-text-foreground "blue")
-                (send dc draw-text "Don't Panic!" 0 0)
-                (draw-hex-grid dc))])
+(define game-frame (new frame% (label "game") (width 600) (height 400)))
+(define game-canvas (new game-canvas% (parent game-frame)))
 
-(send frame show #t)
+(send game-frame show #t)
+
